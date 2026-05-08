@@ -23,6 +23,23 @@ Script Python async otimizado para Termux que agrega múltiplos endpoints de con
 | 6 | DDD | BrasilAPI |
 | 7 | BIN | BinList |
 | 8 | Banco | BrasilAPI |
+| 9 | Clima | IPGeolocation, OpenWeatherMap |
+| A | NCM | BrasilAPI |
+| B | ISBN | BrasilAPI |
+| C | Feriado | BrasilAPI |
+| D | Taxa | BrasilAPI |
+| E | Câmbio | BrasilAPI |
+| F | IBGE | BrasilAPI |
+| G | PIX | BrasilAPI |
+| H | Corretora | CVM |
+| I | Domínio | Registro.br |
+| J | FIPE | BrasilAPI |
+| K | Ticker | BrasilAPI |
+| L | Fundo CVM | CVM |
+| M | Distância | BrasilAPI |
+| N | CNPJ Simples | ReceitaWS |
+| O | CNH | Detran (requer chave) |
+| P | Loterica | BrasilAPI |
 
 ## Instalação
 
@@ -64,17 +81,30 @@ curl -L -A "Mozilla/5.0" https://placaipva.com.br/placa/ABC1234
 echo "nameserver 8.8.8.8" > $PREFIX/etc/resolv.conf
 ```
 
-## Uso
+## Menu
 
-### Modo Interativo
-```bash
-python main.py
 ```
+[1] CPF/GERAR CPF  → Consulta, Gera ou Valida CPF
+[2] CNPJ
+[3] VEÍCULO     → Placa, Chassi, Renavam, Motor
+[4] CEP
+[5] IP
+[6] DDD
+[7] BIN
+[8] BANCO
+[9] CLIMA
+[A] NCM    [E] CÂMBIO
+[B] ISBN   [F] IBGE
+[C] FERIADO[G] PIX
+[D] TAXA   [H] CORRETORA
+[I] DOMÍNIO[J] FIPE
+[K] TICKER[L] FUNDO CVM
+[M] DISTÂNCIA
+[N] CNPJS [O] CNH
+[P] LOTÉRICA
 
-### Linha de Comando
-```bash
-# CPF
-python main.py cpf 12345678900
+[G] GERAR CPF    [H] HISTÓRICO    [C] LIMPAR    [0] SAIR
+```
 
 # CNPJ
 python main.py cnpj 12345678000100
@@ -96,6 +126,65 @@ python main.py bin 453201
 
 # Banco (lista)
 python main.py banco
+
+# Clima
+python main.py clima
+
+# NCM
+python main.py ncm 85176200
+
+# ISBN
+python main.py isbn 9788522034567
+
+# Feriado
+python main.py feriado 2026
+
+# Taxa
+python main.py taxa selic
+python main.py taxa  # lista todas
+
+# Câmbio
+python main.py cambio usd
+python main.py cambio  # lista moedas
+
+# IBGE
+python main.py ibge sp  # municipios de SP
+python main.py ibge  # lista estados
+
+# PIX
+python main.py pix nubank
+python main.py pix  # lista participantes
+
+# Corretora
+python main.py corretora 12345678000100
+
+# Domínio
+python main.py dominio google.com.br
+
+# FIPE
+python main.py fipe  # lista marcas
+python main.py fipe carros 123  # modelos
+
+# Ticker
+python main.py ticker acoes
+python main.py ticker fundos
+
+# Fundo CVM
+python main.py fundos 12345678000112
+python main.py fundos  # lista fundos
+
+# Distância
+python main.py distancia "São Paulo, SP" "Rio de Janeiro, RJ"
+
+# CNPJ Simples
+python main.py cnpjs 12345678000100
+
+# CNH
+python main.py cnh 12345678901
+
+# Lotérica
+python main.py loterica mega-sena
+python main.py loterica  # lista jogos
 ```
 
 ### Outras Opções

@@ -216,8 +216,9 @@ class Validators:
         if len(cpf) != 11 or cpf == cpf[0] * 11:
             return False
         
+        soma = 0
         for i in range(9):
-            soma = int(cpf[i]) * (10 - i)
+            soma += int(cpf[i]) * (10 - i)
         digito1 = (soma * 10 % 11) % 10
         
         soma = sum(int(cpf[i]) * (11 - i) for i in range(10))
