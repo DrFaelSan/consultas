@@ -33,12 +33,26 @@ Internet
 
 
 
-
 ```bash
-git clone https://github.com/DrFaelSan/rafa8-consultas.git
+pkg update && pkg upgrade
+pkg install ca-certificates
+git clone https://github.com/DrFaelSan/consultas.git
 cd consultas
 chmod +x install.sh
 ./install.sh
+```
+
+Ou manualmente:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Desinstalação
+
+```bash
+cd ..
+rm -rf consultas
 ```
 
 Ou manualmente:
