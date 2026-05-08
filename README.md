@@ -5,9 +5,10 @@ Script Python async otimizado para Termux que agrega múltiplos endpoints de con
 ## Características
 
 - **Async/Await** - Consultas paralelas com `aiohttp`
-- **Timeout** - 10 segundos por request
+- **Timeout** - 10-20 segundos por request
 - **Retry** - 2 tentativas automáticas em caso de falha
 - **Fallback** - Tenta múltiplas fontes automaticamente
+- **Cloudflare Bypass** - Usa cloudscraper com perfil Desktop
 - **Leve** - Apenas `aiohttp` + `cloudscraper` como dependências
 
 ## Tipos de Consulta
@@ -16,7 +17,7 @@ Script Python async otimizado para Termux que agrega múltiplos endpoints de con
 |--------|------|--------|
 | 1 | CPF | BrazilAPI, ReceitaWS |
 | 2 | CNPJ | BrasilAPI, ReceitaWS |
-| 3 | Placa | ApiCarros (cloudscraper), Sinesp, ConsultaDF |
+| 3 | Placa | PlacaIPVA, KePlaca, PlacaFIPE, ApiCarros |
 | 4 | CEP | ViaCEP, Postmon, ApiCEP |
 | 5 | IP | IP-API, IPInfo, IPWhois |
 | 6 | DDD | BrasilAPI |
@@ -33,7 +34,7 @@ Requisitos
 
 ```bash
 pkg update && pkg upgrade
-pkg install ca-certificates
+pkg install ca-certificates openssl
 git clone https://github.com/DrFaelSan/consultas.git
 cd consultas
 chmod +x install.sh
@@ -47,11 +48,20 @@ pip install -r requirements.txt
 pip install cloudscraper
 ```
 
-## Desinstalação
+## Troubleshooting (Termux)
+
+Se houver erro de conexão:
 
 ```bash
-cd ..
-rm -rf consultas
+# Atualizar certificados
+pkg update && pkg upgrade
+pkg install ca-certificates openssl
+
+# Testar conectividade
+curl -L -A "Mozilla/5.0" https://placaipva.com.br/placa/ABC1234
+
+# Forçar DNS do Google
+echo "nameserver 8.8.8.8" > $PREFIX/etc/resolv.conf
 ```
 
 ## Uso
@@ -113,7 +123,7 @@ python main.py --clear-cache
 
 ## Nota
 
-APIs governamentais como SINESP podem ficar offline frequentemente. O script tenta outras fontes automaticamente em caso de falha.
+consultas de Placa dependem de scraping de sites públicos. Se todos falharem, os sites podem estar temporariamente offline ou bloqueando seu IP.
 
 ---
 

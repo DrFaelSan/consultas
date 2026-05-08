@@ -268,27 +268,20 @@ class ConsultaCPF:
             url = f"https://api.brazilapi.com.br/cpf/v1/{cpf}"
             result = await client.get(url)
             if result and 'error' not in result:
+                print(C.t(C.VERDE, "  ✓ BrazilAPI: OK"))
                 return {'fonte': 'BrazilAPI', 'dados': result}
+            print(C.t(C.VERMELHO, "  ✗ BrazilAPI: Falhou"))
             
             # ReceitaWS
             print(C.t(C.AZUL, "  → ReceitaWS..."))
             url = f"https://www.receitaws.com.br/v1/cpf/{cpf}"
             result = await client.get(url)
             if result and result.get('status') != 'ERROR':
+                print(C.t(C.VERDE, "  ✓ ReceitaWS: OK"))
                 return {'fonte': 'ReceitaWS', 'dados': result}
-            
-            # RapidAPI (alternativa)
-            print(C.t(C.AZUL, "  → RapidAPI..."))
-            url = f"https://consulta-cpf2.p.rapidapi.com/apis/astrahvhdeus/Consultas%20Privadas/HTML/cpf.php?consulta={cpf}"
-            headers = {
-                'x-rapidapi-key': Config.RAPIDAPI_KEY,
-                'x-rapidapi-host': 'consulta-cpf2.p.rapidapi.com'
-            }
-            result = await client.get(url, headers=headers)
-            if result and 'A Consulta Esta Funcionando Normally' not in str(result):
-                return {'fonte': 'RapidAPI', 'dados': result}
+            print(C.t(C.VERMELHO, "  ✗ ReceitaWS: Falhou"))
         
-        return {'fonte': 'nenhuma', 'dados': {'erro': 'CPF não encontrado em nenhuma fonte'}}
+        return {'fonte': 'nenhuma', 'dados': {'erro': 'CPF não encontrado'}}
     
     @staticmethod
     def formatar(resultado: Dict) -> str:
@@ -306,7 +299,7 @@ class ConsultaCPF:
 
 
 class ConsultaCNPJ:
-    """Consulta CNPJ - 2+ fontes (suporta formato alfanumérico 2026+)"""
+    """Consulta CNPJ - 2+ fontes"""
     
     @staticmethod
     async def consultar(cnpj: str) -> Dict:
@@ -319,21 +312,18 @@ class ConsultaCNPJ:
             url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj}"
             result = await client.get(url)
             if result and 'error' not in result:
+                print(C.t(C.VERDE, "  ✓ BrasilAPI: OK"))
                 return {'fonte': 'BrasilAPI', 'dados': result}
+            print(C.t(C.VERMELHO, "  ✗ BrasilAPI: Falhou"))
             
             # ReceitaWS
             print(C.t(C.AZUL, "  → ReceitaWS..."))
             url = f"https://www.receitaws.com.br/v1/cnpj/{cnpj}"
             result = await client.get(url)
             if result and result.get('status') != 'ERROR':
+                print(C.t(C.VERDE, "  ✓ ReceitaWS: OK"))
                 return {'fonte': 'ReceitaWS', 'dados': result}
-            
-            # BrazilAPI
-            print(C.t(C.AZUL, "  → BrazilAPI..."))
-            url = f"https://api.brazilapi.com.br/cnpj/v1/{cnpj}"
-            result = await client.get(url)
-            if result and 'error' not in result:
-                return {'fonte': 'BrazilAPI', 'dados': result}
+            print(C.t(C.VERMELHO, "  ✗ ReceitaWS: Falhou"))
         
         return {'fonte': 'nenhuma', 'dados': {'erro': 'CNPJ não encontrado'}}
     
@@ -359,98 +349,128 @@ class ConsultaCNPJ:
 
 
 class ConsultaPlaca:
-    """Consulta Placa - Fontes com fallback (apicarros, API Brasil, PlacaCarro, Sinesp)"""
-    
-    API_BRASIL_TOKEN = '9f5938b6-b2eb-4c4f-94f1-4fcbda0e66d8'
+    """Consulta Placa com fallback usando cloudscraper (bypass Cloudflare)"""
     
     @staticmethod
     async def consultar(placa: str) -> Dict:
         placa = Validators.limpar_placa(placa)
         print(C.t(C.CIANO, f"\n[PLACA] {Validators.formatar_placa(placa)}"))
-        
-        async with HttpClient() as client:
-            # ApiCarros (requer cloudscraper para evitar Cloudflare)
-            print(C.t(C.AZUL, "  → ApiCarros..."))
+
+        # Configuração robusta do cloudscraper com perfil Desktop
+        try:
+            from cloudscraper import create_scraper
+            scraper = create_scraper(
+                browser={
+                    'browser': 'chrome',
+                    'platform': 'windows',
+                    'desktop': True
+                }
+            )
+        except ImportError:
+            print(C.t(C.VERMELHO, "  Cloudscraper não instalado"))
+            print(C.t(C.VERMELHO, "  Execute: pip install cloudscraper"))
+            return {'fonte': 'nenhuma', 'dados': {'erro': 'Dependência ausente'}}
+
+        # Fontes de scraping (sites públicos)
+        fontes = [
+            ('PlacaIPVA', f'https://placaipva.com.br/placa/{placa}', ConsultaPlaca._parse_placaipva),
+            ('KePlaca', f'https://www.keplaca.com/placa/{placa}', ConsultaPlaca._parse_keplaca),
+            ('PlacaFIPE', f'https://placafipe.com/{placa}', ConsultaPlaca._parse_placafipe),
+        ]
+
+        for nome, url, parser in fontes:
+            print(C.t(C.AZUL, f"  → {nome}..."))
             try:
-                from cloudscraper import create_scraper
-                scraper = create_scraper()
-                url = f'https://apicarros.com/v1/consulta/{placa}'
-                response = scraper.get(url, timeout=15)
+                response = await asyncio.to_thread(scraper.get, url, timeout=20)
                 if response.status_code == 200:
-                    try:
-                        result = response.json()
-                        if result and isinstance(result, dict) and 'error' not in str(result).lower():
-                            return {'fonte': 'ApiCarros', 'dados': result}
-                    except:
-                        pass
-            except ImportError:
-                print(C.t(C.AMARELO, "  Cloudscraper não instalado"))
+                    dados = parser(response.text)
+                    if dados and dados.get('marca'):
+                        print(C.t(C.VERDE, f"  ✓ {nome}: OK"))
+                        return {'fonte': nome, 'dados': dados}
+                    else:
+                        print(C.t(C.AMARELO, f"  {nome}: HTML sem dados"))
+                elif response.status_code == 403:
+                    print(C.t(C.AMARELO, f"  {nome}: Bloqueado (403)"))
+                else:
+                    print(C.t(C.AMARELO, f"  {nome}: HTTP {response.status_code}"))
             except Exception as e:
-                print(C.t(C.AMARELO, f"  ApiCarros: {str(e)[:40]}"))
-            
-            # API Brasil (referencias/tgaapi)
-            print(C.t(C.AZUL, "  → API Brasil..."))
-            try:
-                url = f'https://apibrasil.com.br/api/placa/v1'
-                headers = {'Authorization': f'Bearer {ConsultaPlaca.API_BRASIL_TOKEN}'}
-                async with client.session.get(f'{url}/{placa}', headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                    if resp.status == 200:
-                        result = await resp.json()
-                        if result and isinstance(result, dict):
-                            return {'fonte': 'APIBrasil', 'dados': result}
-            except Exception as e:
-                print(C.t(C.AMARELO, f"  API Brasil: {str(e)[:40]}"))
-            
-            # PlacaCarro-API (scraping placaipva, keplaca, placafipe)
-            print(C.t(C.AZUL, "  → PlacaCarro..."))
-            try:
-                from cloudscraper import create_scraper
-                scraper = create_scraper()
-                
-                for site_url in [
-                    f'https://placaipva.com.br/placa/{placa}',
-                    f'https://www.keplaca.com/placa/{placa}',
-                    f'https://placafipe.com/{placa}'
-                ]:
-                    try:
-                        resp = scraper.get(site_url, timeout=15)
-                        if resp.status_code == 200 and 'erro' not in resp.text.lower()[:100]:
-                            dados = ConsultaPlaca._parse_html_placa(resp.text)
-                            if dados:
-                                return {'fonte': 'PlacaCarro', 'dados': dados}
-                    except:
-                        continue
-            except Exception as e:
-                print(C.t(C.AMARELO, f"  PlacaCarro: {str(e)[:40]}"))
-            
-            # Sinesp (governo)
-            print(C.t(C.AZUL, "  → Sinesp..."))
-            try:
-                url = f'https://api-sinesp.sinesp.gov.br/sinesp-api/v3/consulta/placa/{placa}'
-                async with client.session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                    if resp.status == 200:
-                        result = await resp.json()
-                        if result and 'codigoRetorno' in result and result['codigoRetorno'] == 0:
-                            return {'fonte': 'Sinesp', 'dados': result}
-            except Exception as e:
-                print(C.t(C.AMARELO, f"  Sinesp: {str(e)[:40]}"))
-        
+                print(C.t(C.VERMELHO, f"  ✗ {nome}: {str(e)[:50]}"))
+
+        # Fallback: ApiCarros com cloudscraper
+        print(C.t(C.AZUL, "  → ApiCarros..."))
+        try:
+            url = f'https://apicarros.com/v1/consulta/{placa}'
+            response = await asyncio.to_thread(scraper.get, url, timeout=20)
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    if isinstance(data, dict) and 'erro' not in data and data.get('marca'):
+                        print(C.t(C.VERDE, "  ✓ ApiCarros: OK"))
+                        return {'fonte': 'ApiCarros', 'dados': data}
+                except:
+                    pass
+            print(C.t(C.VERMELHO, "  ✗ ApiCarros: Falhou"))
+        except Exception as e:
+            print(C.t(C.VERMELHO, f"  ✗ ApiCarros: {str(e)[:50]}"))
+
         return {'fonte': 'nenhuma', 'dados': {'erro': 'Placa não encontrada'}}
-    
+
     @staticmethod
-    def _parse_html_placa(html: str) -> Optional[Dict]:
-        """Parse HTML from scraping sites"""
+    def _parse_placaipva(html: str) -> Optional[Dict]:
         import re
-        patterns = {
-            'marca': r'<td[^>]*>.*?[Mm]arca.*?</td>\s*<td[^>]*>([^<]+)',
-            'modelo': r'<td[^>]*>.*?[Mm]odelo.*?</td>\s*<td[^>]*>([^<]+)',
-            'ano': r'<td[^>]*>.*?[Aa]no.*?</td>\s*<td[^>]*>([^<]+)',
-            'cor': r'<td[^>]*>.*?[Cc]or.*?</td>\s*<td[^>]*>([^<]+)',
-            'uf': r'<td[^>]*>.*?[Uu]F.*?</td>\s*<td[^>]*>([^<]+)',
-        }
         dados = {}
-        for key, pattern in patterns.items():
-            match = re.search(pattern, html)
+        patterns = [
+            (r'<th>Marca</th>\s*<td[^>]*>([^<]+)', 'marca'),
+            (r'<th>Modelo</th>\s*<td[^>]*>([^<]+)', 'modelo'),
+            (r'<th>Ano</th>\s*<td[^>]*>([^<]+)', 'ano'),
+            (r'<th>Cor</th>\s*<td[^>]*>([^<]+)', 'cor'),
+            (r'<th>UF</th>\s*<td[^>]*>([^<]+)', 'uf'),
+        ]
+        for pattern, key in patterns:
+            match = re.search(pattern, html, re.IGNORECASE | re.DOTALL)
+            if match:
+                dados[key] = match.group(1).strip()
+        if not dados:
+            for key, pattern in [('marca', r'Marca[:\s]*([^<\n]+)'), ('modelo', r'Modelo[:\s]*([^<\n]+)')]:
+                match = re.search(pattern, html, re.IGNORECASE)
+                if match:
+                    dados[key] = match.group(1).strip()
+        return dados if dados else None
+
+    @staticmethod
+    def _parse_keplaca(html: str) -> Optional[Dict]:
+        import re
+        dados = {}
+        patterns = [
+            (r'Marca</span>\s*<span[^>]*>([^<]+)', 'marca'),
+            (r'Modelo</span>\s*<span[^>]*>([^<]+)', 'modelo'),
+            (r'Ano</span>\s*<span[^>]*>([^<]+)', 'ano'),
+        ]
+        for pattern, key in patterns:
+            match = re.search(pattern, html, re.IGNORECASE)
+            if match:
+                dados[key] = match.group(1).strip()
+        if not dados:
+            for key, pattern in [('marca', r'Marca[:\s]*([^<\n]+)'), ('modelo', r'Modelo[:\s]*([^<\n]+)')]:
+                match = re.search(pattern, html, re.IGNORECASE)
+                if match:
+                    dados[key] = match.group(1).strip()
+        return dados if dados else None
+
+    @staticmethod
+    def _parse_placafipe(html: str) -> Optional[Dict]:
+        import re, json
+        dados = {}
+        script_match = re.search(r'<script[^>]*>(\{.*?\})</script>', html, re.DOTALL)
+        if script_match:
+            try:
+                data = json.loads(script_match.group(1))
+                if isinstance(data, dict):
+                    return {'marca': data.get('marca', ''), 'modelo': data.get('modelo', ''), 'ano': data.get('ano', '')}
+            except:
+                pass
+        for key, pattern in [('marca', r'Marca[:\s]*([^<\n]+)'), ('modelo', r'Modelo[:\s]*([^<\n]+)')]:
+            match = re.search(pattern, html, re.IGNORECASE)
             if match:
                 dados[key] = match.group(1).strip()
         return dados if dados else None
