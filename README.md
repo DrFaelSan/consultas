@@ -41,6 +41,19 @@ Script Python async otimizado para Termux que agrega múltiplos endpoints de con
 | O | CNH | Detran (requer chave) |
 | P | Loterica | BrasilAPI |
 
+## Desinstalação
+
+```bash
+cd ..
+rm -rf consultas
+```
+
+Ou manualmente:
+
+```bash
+pip install -r requirements.txt
+```
+
 ## Instalação
 
 Requisitos
