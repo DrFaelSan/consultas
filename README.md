@@ -63,7 +63,24 @@ Ou manualmente:
 ```bash
 pip install -r requirements.txt
 pip install cloudscraper
+cp .env.example .env
+# Edite o arquivo .env com suas chaves de API
 ```
+
+### Configuração de API Keys (opcional)
+
+Copie o arquivo `.env.example` para `.env` e adicione suas chaves:
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Variáveis disponíveis:
+- `BRASIL_API_KEY` - API Brasil (https://brasilapi.com.br)
+- `OPENWEATHER_API_KEY` - OpenWeatherMap (https://openweathermap.org)
+- `IPGEOLOCATION_KEY` - IPGeolocation (https://ipgeolocation.io)
+- `API_BRASIL_PLACA_KEY` - API Brasil Placa (https://apibrasil.com.br)
 
 ## Troubleshooting (Termux)
 

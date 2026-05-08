@@ -20,6 +20,26 @@ import random
 import math
 from typing import Optional, Dict, Any, List
 from datetime import datetime
+from pathlib import Path
+
+# Carregar variáveis de ambiente
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent / '.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        print("Arquivo .env não encontrado. Copie .env.example para .env")
+except ImportError:
+    pass
+
+# Configurações com fallback para valores padrão
+CONFIG = {
+    'BRASIL_API_KEY': os.getenv('BRASIL_API_KEY', ''),
+    'OPENWEATHER_API_KEY': os.getenv('OPENWEATHER_API_KEY', '6e5f80bfbe2dd7591b7a9d65157d7e4b'),
+    'IPGEOLOCATION_KEY': os.getenv('IPGEOLOCATION_KEY', '13a008ccb7594d1cb4a6e986847fc507'),
+    'API_BRASIL_PLACA_KEY': os.getenv('API_BRASIL_PLACA_KEY', '9f5938b6-b2eb-4c4f-94f1-4fcbda0e66d8'),
+}
 
 try:
     import aiohttp
@@ -751,8 +771,13 @@ class ConsultaBanco:
 class ConsultaClima:
     """Consulta Clima - Temperatura por localização"""
     
-    OPENWEATHER_API_KEY = '6e5f80bfbe2dd7591b7a9d65157d7e4b'
-    IPGEOLOCATION_KEY = '13a008ccb7594d1cb4a6e986847fc507'
+    @property
+    def OPENWEATHER_API_KEY(self):
+        return CONFIG.get('OPENWEATHER_API_KEY') or '6e5f80bfbe2dd7591b7a9d65157d7e4b'
+    
+    @property
+    def IPGEOLOCATION_KEY(self):
+        return CONFIG.get('IPGEOLOCATION_KEY') or '13a008ccb7594d1cb4a6e986847fc507'
     
     @staticmethod
     async def consultar(localizacao: str = None) -> Dict:
@@ -760,7 +785,7 @@ class ConsultaClima:
         
         async with HttpClient() as client:
             print(C.t(C.AZUL, "  → IPGeolocation..."))
-            url = f'https://api.ipgeolocation.io/ipgeo?apiKey={ConsultaClima.IPGEOLOCATION_KEY}'
+            url = f'https://api.ipgeolocation.io/ipgeo?apiKey={CONFIG.get("IPGEOLOCATION_KEY", "13a008ccb7594d1cb4a6e986847fc507")}'
             result = await client.get(url)
             if result and result.get('latitude'):
                 lat, lon = result.get('latitude'), result.get('longitude')
@@ -768,7 +793,7 @@ class ConsultaClima:
                 pais = result.get('country_name', 'BR')
                 
                 print(C.t(C.AZUL, "  → OpenWeatherMap..."))
-                weather_url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={ConsultaClima.OPENWEATHER_API_KEY}&units=metric&lang=pt_br"
+                weather_url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={CONFIG.get('OPENWEATHER_API_KEY', '6e5f80bfbe2dd7591b7a9d65157d7e4b')}&units=metric&lang=pt_br"
                 weather_result = await client.get(weather_url)
                 if weather_result and weather_result.get('main'):
                     dados = {
