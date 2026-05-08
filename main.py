@@ -91,13 +91,23 @@ class C:
 class HttpClient:
     """Cliente HTTP async com timeout e retry"""
     
+    DEFAULT_HEADERS = {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+        'Accept': 'application/json, text/html, */*',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+    }
+    
     def __init__(self):
         self.session: Optional[aiohttp.ClientSession] = None
     
     async def __aenter__(self):
         self.session = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=Config.TIMEOUT),
-            connector=aiohttp.TCPConnector(limit=10)
+            connector=aiohttp.TCPConnector(
+                limit=10,
+                ssl=False
+            ),
+            headers=self.DEFAULT_HEADERS
         )
         return self
     
@@ -111,7 +121,15 @@ class HttpClient:
             try:
                 async with self.session.get(url, **kwargs) as resp:
                     if resp.status == 200:
-                        return await resp.json()
+                        text = await resp.text()
+                        if '<!DOCTYPE html>' in text or '<html' in text[:50]:
+                            print(C.t(C.AMARELO, "  Erro: Servidor retornou HTML (possível bloqueio)"))
+                            return None
+                        try:
+                            return json.loads(text)
+                        except json.JSONDecodeError:
+                            print(C.t(C.AMARELO, f"  Erro: JSON inválido"))
+                            return None
             except asyncio.TimeoutError:
                 print(C.t(C.AMARELO, f"  Timeout na tentativa {attempt + 1}"))
             except Exception as e:
@@ -354,32 +372,41 @@ class ConsultaPlaca:
             try:
                 url = f'https://apicarros.com/v1/consulta/{placa}'
                 result = await client.get(url)
-                if result:
-                    return {'fonte': 'ApiCarros', 'dados': result}
+                if result and isinstance(result, dict):
+                    if 'error' not in str(result).lower():
+                        return {'fonte': 'ApiCarros', 'dados': result}
             except Exception as e:
-                print(C.t(C.AMARELO, f"  ApiCarros: {str(e)[:40]}"))
+                erro = str(e)
+                if 'ssl' in erro.lower() or 'certificate' in erro.lower():
+                    print(C.t(C.AMARELO, "  ApiCarros: Erro SSL. Execute: pkg upgrade && pkg install ca-certificates"))
+                else:
+                    print(C.t(C.AMARELO, f"  ApiCarros: {erro[:40]}"))
             
             # PlacaFipy
             print(C.t(C.AZUL, "  → PlacaFipy..."))
             try:
                 url = f'https://placafipy.com/api/consulta/{placa}'
                 result = await client.get(url)
-                if result:
+                if result and isinstance(result, dict):
                     return {'fonte': 'PlacaFipy', 'dados': result}
             except Exception as e:
-                print(C.t(C.AMARELO, f"  PlacaFipy: {str(e)[:40]}"))
+                erro = str(e)
+                if 'ssl' in erro.lower() or 'certificate' in erro.lower():
+                    print(C.t(C.AMARELO, "  PlacaFipy: Erro SSL"))
+                else:
+                    print(C.t(C.AMARELO, f"  PlacaFipy: {erro[:40]}"))
             
-            # FIPE API
+            # FIPE API (alternativa via tabela FIPE)
             print(C.t(C.AZUL, "  → FIPE..."))
             try:
-                url = f'https://api.fipe.com.br/api/v1/carros/marcas'
-                result = await client.get(url, timeout=5)
-                if result:
-                    return {'fonte': 'FIPE', 'dados': {'info': 'Consulte via app FIPE'}}
+                url = f'https://parallel.arms.dev/v1/fipe/placa/{placa}'
+                result = await client.get(url)
+                if result and isinstance(result, dict):
+                    return {'fonte': 'FIPE-Dev', 'dados': result}
             except Exception as e:
                 print(C.t(C.AMARELO, f"  FIPE: {str(e)[:40]}"))
         
-        return {'fonte': 'nenhuma', 'dados': {'erro': 'Placa não encontrada'}}
+        return {'fonte': 'nenhuma', 'dados': {'erro': 'Placa não encontrada - Estas APIs podem estar offline ou bloqueadas no Termux'}}
     
     @staticmethod
     def formatar(resultado: Dict) -> str:
