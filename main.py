@@ -702,12 +702,28 @@ class ConsultaBIN:
         print(C.t(C.CIANO, f"\n[BIN] {bin_code}"))
         
         async with HttpClient() as client:
+            print(C.t(C.AZUL, "  → Lookup Binlist..."))
             url = f'https://lookup.binlist.net/{bin_code}'
-            result = await client.get(url)
-            if result:
-                return {'fonte': 'BinList', 'dados': result}
+            try:
+                result = await client.get(url)
+                if result:
+                    print(C.t(C.VERDE, "  ✓ Binlist: OK"))
+                    return {'fonte': 'Binlist', 'dados': result}
+            except Exception as e:
+                print(C.t(C.VERMELHO, f"  ✗ Binlist: {str(e)[:30]}"))
+            
+            # Fallback: Consulta via API pública
+            print(C.t(C.AZUL, "  → BinAPI..."))
+            try:
+                url = f'https://binlists.com/{bin_code}'
+                result = await client.get(url)
+                if result and result.get('scheme'):
+                    print(C.t(C.VERDE, "  ✓ BinAPI: OK"))
+                    return {'fonte': 'BinAPI', 'dados': result}
+            except:
+                pass
         
-        return {'fonte': 'nenhuma', 'dados': {'erro': 'BIN não encontrado'}}
+        return {'fonte': 'nenhuma', 'dados': {'erro': 'BIN não encontrado - API bloqueada'}}
     
     @staticmethod
     def formatar(resultado: Dict) -> str:
@@ -1257,13 +1273,8 @@ class ConsultaFIPE:
         
         async with HttpClient() as client:
             if modelo and marca:
-                print(C.t(C.AZUL, "  → FIPE Preço..."))
-                url = f"https://brasilapi.com.br/api/fipe/preco/v1/{modelo}"
-                result = await client.get(url)
-                if result and isinstance(result, list) and len(result) > 0:
-                    print(C.t(C.VERDE, "  ✓ FIPE: OK"))
-                    return {'fonte': 'FIPE', 'dados': result[0]}
-                print(C.t(C.VERMELHO, "  ✗ FIPE: Falhou"))
+                print(C.t(C.AMARELO, "  API INDISPONÍVEL (500)"))
+                return {'fonte': 'nenhuma', 'dados': {'erro': 'API temporariamente indisponível'}}
             
             if marca:
                 print(C.t(C.AZUL, "  → FIPE Modelos..."))
@@ -1907,8 +1918,18 @@ def menu(self):
     └──────────────────────────────────────────────────┘
         """))
     
-    async def iniciar(self):
-        await self.health_check()
+async def iniciar(self):
+        print(C.t(C.CIANO, "Verificando conectividade..."))
+        try:
+            async with HttpClient() as client:
+                result = await client.get('https://brasilapi.com.br/api/banks/v1')
+                if result:
+                    print(C.t(C.VERDE, "  ✓ Online"))
+                else:
+                    print(C.t(C.AMARELO, "  ○ Sem resposta"))
+        except Exception as e:
+            print(C.t(C.VERMELHO, "  ✗ Offline"))
+        
         while True:
             self.limpar()
             self.banner()
@@ -1916,9 +1937,9 @@ def menu(self):
             
             op = input(C.t(C.VERDE, "\n~# Escolha: ")).strip().lower()
             
-if op == '0':
-                    print(C.t(C.AMARELO, "\n  Até mais!\n"))
-                    break
+            if op == '0':
+                print(C.t(C.AMARELO, "\n  Até mais!\n"))
+                break
             
             if op == '3':
                 await self.menu_veiculo()

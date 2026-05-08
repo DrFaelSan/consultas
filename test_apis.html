@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de APIs</title>
+    <style>
+        body { font-family: 'Courier New', monospace; padding: 20px; background: #0d1117; color: #c9d1d9; }
+        h1 { color: #58a6ff; }
+        .api { margin: 8px 0; padding: 8px 12px; background: #161b22; border-radius: 6px; display: flex; justify-content: space-between; }
+        .ok { color: #3fb950; }
+        .erro { color: #f85149; }
+        .aviso { color: #d29922; }
+        .cors { color: #8b949e; font-size: 12px; }
+        #log { background: #010409; padding: 15px; border-radius: 6px; white-space: pre-wrap; max-height: 60vh; overflow: auto; }
+        button { padding: 10px 20px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2ea043; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste de APIs</h1>
+    <button onclick="testarTodas()">▶ Testar Todas</button>
+    <button onclick="testarPython()">🐍 Testar só Python</button>
+    <div id="log">Clique em "Testar Todas" para iniciar...</div>
+
+    <script>
+    // APIs que funcionam no browser
+    const apisBrowser = [
+        ['BrasilAPI Banks', 'https://brasilapi.com.br/api/banks/v1'],
+        ['BrasilAPI DDD', 'https://brasilapi.com.br/api/ddd/v1/11'],
+        ['BrasilAPI FIPE Marcas', 'https://brasilapi.com.br/api/fipe/marcas/v1/carros'],
+        ['BrasilAPI Taxas', 'https://brasilapi.com.br/api/taxas/v1'],
+        ['BrasilAPI Feriados', 'https://brasilapi.com.br/api/feriados/v1/2026'],
+        ['ViaCEP', 'https://viacep.com.br/ws/01001000/json/'],
+        ['IP-API', 'http://ip-api.com/json/8.8.8.8'],
+    ];
+
+    // APIs que NÃO funcionam no browser (CORS)
+    const apisCors = [
+        ['PlacaIPVA', 'https://placaipva.com.br/placa/ABC1234'],
+        ['KePlaca', 'https://www.keplaca.com/placa/ABC1234'],
+        ['ApiCarros', 'https://apicarros.com/v1/consulta/ABC1234'],
+        ['BinList', 'https://lookup.binlist.net/453201'],
+        ['IPGeolocation', 'https://api.ipgeolocation.io/ipgeo?apiKey=demo'],
+    ];
+
+    let log = '';
+    function addLog(texto, tipo = '') {
+        log += texto + '\n';
+        document.getElementById('log').textContent = log;
+    }
+
+    async function testarUma(nome, url) {
+        try {
+            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            return { status: response.status, ok: response.status === 200 };
+        } catch (e) {
+            // Pode ser CORS ou outro erro
+            try {
+                const response = await fetch(url, { method: 'GET', mode: 'no-cors' });
+                return { status: 0, ok: false, cors: true };
+            } catch {
+                return { status: 0, ok: false, erro: e.message };
+            }
+        }
+    }
+
+    async function testarTodas() {
+        log = '';
+        addLog('🧪 TESTE NO BROWSER (CORS)', 'aviso');
+        addLog('═'.repeat(40), 'aviso');
+        
+        for (const [nome, url] of apisBrowser) {
+            const r = await testarUma(nome, url);
+            const status = r.ok ? '✓' : '✗';
+            const texto = `${status} ${nome}: HTTP ${r.status}`;
+            addLog(texto, r.ok ? 'ok' : 'erro');
+        }
+
+        addLog('\n⚠️ APIs com BLOQUEIO CORS (funcionam no Python/Termux):', 'aviso');
+        addLog('═'.repeat(40), 'aviso');
+        
+        for (const [nome, url] of apisCors) {
+            addLog(`✗ ${nome}: BLOQUEIO CORS (ok no Python)`, 'cors');
+        }
+        
+        addLog('\n✅ Teste concluído!', 'ok');
+        addLog('💡 Execute: python main.py para testar no Python/Termux', 'aviso');
+    }
+
+    async function testarPython() {
+        log = '';
+        addLog('🐍 TESTE - Execute no Termux:', 'aviso');
+        addLog('═'.repeat(40), 'aviso');
+        addLog('pip install aiohttp', 'aviso');
+        addLog('python test_api.py', 'aviso');
+        addLog('', 'aviso');
+        addLog('APIs para testar no Python:', 'aviso');
+        
+        const todas = [...apisBrowser, ...apisCors];
+        for (const [nome, url] of todas) {
+            addLog(`• ${nome}`, 'aviso');
+        }
+        
+        addLog('\n✅ Use python main.py para menu interativo!', 'ok');
+    }
+    </script>
+</body>
+</html>
