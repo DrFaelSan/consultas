@@ -359,7 +359,9 @@ class ConsultaCNPJ:
 
 
 class ConsultaPlaca:
-    """Consulta Placa - 3 fontes (ApiCarros, PlacaFipy, FIPE)"""
+    """Consulta Placa - Fontes com fallback (apicarros, API Brasil, PlacaCarro, Sinesp)"""
+    
+    API_BRASIL_TOKEN = '9f5938b6-b2eb-4c4f-94f1-4fcbda0e66d8'
     
     @staticmethod
     async def consultar(placa: str) -> Dict:
@@ -367,46 +369,91 @@ class ConsultaPlaca:
         print(C.t(C.CIANO, f"\n[PLACA] {Validators.formatar_placa(placa)}"))
         
         async with HttpClient() as client:
-            # ApiCarros
+            # ApiCarros (requer cloudscraper para evitar Cloudflare)
             print(C.t(C.AZUL, "  → ApiCarros..."))
             try:
+                from cloudscraper import create_scraper
+                scraper = create_scraper()
                 url = f'https://apicarros.com/v1/consulta/{placa}'
-                result = await client.get(url)
-                if result and isinstance(result, dict):
-                    if 'error' not in str(result).lower():
-                        return {'fonte': 'ApiCarros', 'dados': result}
+                response = scraper.get(url, timeout=15)
+                if response.status_code == 200:
+                    try:
+                        result = response.json()
+                        if result and isinstance(result, dict) and 'error' not in str(result).lower():
+                            return {'fonte': 'ApiCarros', 'dados': result}
+                    except:
+                        pass
+            except ImportError:
+                print(C.t(C.AMARELO, "  Cloudscraper não instalado"))
             except Exception as e:
-                erro = str(e)
-                if 'ssl' in erro.lower() or 'certificate' in erro.lower():
-                    print(C.t(C.AMARELO, "  ApiCarros: Erro SSL. Execute: pkg upgrade && pkg install ca-certificates"))
-                else:
-                    print(C.t(C.AMARELO, f"  ApiCarros: {erro[:40]}"))
+                print(C.t(C.AMARELO, f"  ApiCarros: {str(e)[:40]}"))
             
-            # PlacaFipy
-            print(C.t(C.AZUL, "  → PlacaFipy..."))
+            # API Brasil (referencias/tgaapi)
+            print(C.t(C.AZUL, "  → API Brasil..."))
             try:
-                url = f'https://placafipy.com/api/consulta/{placa}'
-                result = await client.get(url)
-                if result and isinstance(result, dict):
-                    return {'fonte': 'PlacaFipy', 'dados': result}
+                url = f'https://apibrasil.com.br/api/placa/v1'
+                headers = {'Authorization': f'Bearer {ConsultaPlaca.API_BRASIL_TOKEN}'}
+                async with client.session.get(f'{url}/{placa}', headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        if result and isinstance(result, dict):
+                            return {'fonte': 'APIBrasil', 'dados': result}
             except Exception as e:
-                erro = str(e)
-                if 'ssl' in erro.lower() or 'certificate' in erro.lower():
-                    print(C.t(C.AMARELO, "  PlacaFipy: Erro SSL"))
-                else:
-                    print(C.t(C.AMARELO, f"  PlacaFipy: {erro[:40]}"))
+                print(C.t(C.AMARELO, f"  API Brasil: {str(e)[:40]}"))
             
-            # FIPE API (alternativa via tabela FIPE)
-            print(C.t(C.AZUL, "  → FIPE..."))
+            # PlacaCarro-API (scraping placaipva, keplaca, placafipe)
+            print(C.t(C.AZUL, "  → PlacaCarro..."))
             try:
-                url = f'https://parallel.arms.dev/v1/fipe/placa/{placa}'
-                result = await client.get(url)
-                if result and isinstance(result, dict):
-                    return {'fonte': 'FIPE-Dev', 'dados': result}
+                from cloudscraper import create_scraper
+                scraper = create_scraper()
+                
+                for site_url in [
+                    f'https://placaipva.com.br/placa/{placa}',
+                    f'https://www.keplaca.com/placa/{placa}',
+                    f'https://placafipe.com/{placa}'
+                ]:
+                    try:
+                        resp = scraper.get(site_url, timeout=15)
+                        if resp.status_code == 200 and 'erro' not in resp.text.lower()[:100]:
+                            dados = ConsultaPlaca._parse_html_placa(resp.text)
+                            if dados:
+                                return {'fonte': 'PlacaCarro', 'dados': dados}
+                    except:
+                        continue
             except Exception as e:
-                print(C.t(C.AMARELO, f"  FIPE: {str(e)[:40]}"))
+                print(C.t(C.AMARELO, f"  PlacaCarro: {str(e)[:40]}"))
+            
+            # Sinesp (governo)
+            print(C.t(C.AZUL, "  → Sinesp..."))
+            try:
+                url = f'https://api-sinesp.sinesp.gov.br/sinesp-api/v3/consulta/placa/{placa}'
+                async with client.session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        if result and 'codigoRetorno' in result and result['codigoRetorno'] == 0:
+                            return {'fonte': 'Sinesp', 'dados': result}
+            except Exception as e:
+                print(C.t(C.AMARELO, f"  Sinesp: {str(e)[:40]}"))
         
-        return {'fonte': 'nenhuma', 'dados': {'erro': 'Placa não encontrada - Estas APIs podem estar offline ou bloqueadas no Termux'}}
+        return {'fonte': 'nenhuma', 'dados': {'erro': 'Placa não encontrada'}}
+    
+    @staticmethod
+    def _parse_html_placa(html: str) -> Optional[Dict]:
+        """Parse HTML from scraping sites"""
+        import re
+        patterns = {
+            'marca': r'<td[^>]*>.*?[Mm]arca.*?</td>\s*<td[^>]*>([^<]+)',
+            'modelo': r'<td[^>]*>.*?[Mm]odelo.*?</td>\s*<td[^>]*>([^<]+)',
+            'ano': r'<td[^>]*>.*?[Aa]no.*?</td>\s*<td[^>]*>([^<]+)',
+            'cor': r'<td[^>]*>.*?[Cc]or.*?</td>\s*<td[^>]*>([^<]+)',
+            'uf': r'<td[^>]*>.*?[Uu]F.*?</td>\s*<td[^>]*>([^<]+)',
+        }
+        dados = {}
+        for key, pattern in patterns.items():
+            match = re.search(pattern, html)
+            if match:
+                dados[key] = match.group(1).strip()
+        return dados if dados else None
     
     @staticmethod
     def formatar(resultado: Dict) -> str:

@@ -8,15 +8,15 @@ Script Python async otimizado para Termux que agrega múltiplos endpoints de con
 - **Timeout** - 10 segundos por request
 - **Retry** - 2 tentativas automáticas em caso de falha
 - **Fallback** - Tenta múltiplas fontes automaticamente
-- **Leve** - Apenas `aiohttp` como dependência
+- **Leve** - Apenas `aiohttp` + `cloudscraper` como dependências
 
 ## Tipos de Consulta
 
 | Código | Tipo | Fontes |
 |--------|------|--------|
-| 1 | CPF | BrazilAPI, ReceitaWS, RapidAPI |
-| 2 | CNPJ | BrasilAPI, ReceitaWS, BrazilAPI |
-| 3 | Placa | ApiCarros, PlacaFipy, FIPE |
+| 1 | CPF | BrazilAPI, ReceitaWS |
+| 2 | CNPJ | BrasilAPI, ReceitaWS |
+| 3 | Placa | ApiCarros (cloudscraper), Sinesp, ConsultaDF |
 | 4 | CEP | ViaCEP, Postmon, ApiCEP |
 | 5 | IP | IP-API, IPInfo, IPWhois |
 | 6 | DDD | BrasilAPI |
@@ -27,11 +27,9 @@ Script Python async otimizado para Termux que agrega múltiplos endpoints de con
 
 Requisitos
 
-Python 3.8+
-Internet
-(Opcional) Termux no Android
-
-
+- Python 3.8+
+- Internet
+- (Opcional) Termux no Android
 
 ```bash
 pkg update && pkg upgrade
@@ -46,6 +44,7 @@ Ou manualmente:
 
 ```bash
 pip install -r requirements.txt
+pip install cloudscraper
 ```
 
 ## Desinstalação
@@ -53,12 +52,6 @@ pip install -r requirements.txt
 ```bash
 cd ..
 rm -rf consultas
-```
-
-Ou manualmente:
-
-```bash
-pip install -r requirements.txt
 ```
 
 ## Uso
@@ -104,18 +97,11 @@ python main.py --history
 python main.py --clear-cache
 ```
 
-## Configuração (Variáveis de Ambiente)
-
-```bash
-export RAPIDAPI_KEY="sua_chave_aqui"
-export IPGEOLOCATION_KEY="sua_chave_aqui"
-export IPFIND_KEY="sua_chave_aqui"
-```
-
 ## Requisitos
 
 - Python 3.7+
-- aiohttp
+- aiohttp>=3.8.0
+- cloudscraper>=1.2.71
 
 ## Arquivos
 
